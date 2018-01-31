@@ -1,106 +1,7 @@
 pragma solidity ^0.4.18;
 
-/**
- * @title SafeMath
- * @dev Math operations with safety checks that throw on error
- */
-library SafeMath {
-
-  /**
-  * @dev Multiplies two numbers, throws on overflow.
-  */
-  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-    if (a == 0) {
-      return 0;
-    }
-    uint256 c = a * b;
-    assert(c / a == b);
-    return c;
-  }
-
-  /**
-  * @dev Integer division of two numbers, truncating the quotient.
-  */
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    // assert(b > 0); // Solidity automatically throws when dividing by 0
-    uint256 c = a / b;
-    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-    return c;
-  }
-
-  /**
-  * @dev Substracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
-  */
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    assert(b <= a);
-    return a - b;
-  }
-
-  /**
-  * @dev Adds two numbers, throws on overflow.
-  */
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
-    uint256 c = a + b;
-    assert(c >= a);
-    return c;
-  }
-}
-
-contract BallotSB52 {
-  using SafeMath for uint;
-  uint public forResult;
-  uint public againstResult;
-  uint public result;
-  address bettingContract;
-  mapping (address => bool) voted;
-  mapping (address => bool) votes;
-  uint public constant votingPeriod = 7 days;
-  uint public votingStart;
-  uint public votingEnd;
-  uint public possibleVoters;
-  bool public validResult;
-  bool public closed;
-  uint public totalVoters;
-  // XX.XXX%
-  uint public threshold;
-
-  function BallotSB52(uint team, uint voters, uint th) public {
-    result = team;
-    possibleVoters = voters;
-    validResult = false;
-    closed = false;
-    votingStart = now;
-    bettingContract = msg.sender;
-    totalVoters = 0;
-    threshold = th;
-  }
-
-  // you can only vote once
-  function voteResult(bool approve, address voter) public {
-    require(votingStart <= now && votingEnd >= now);
-    require(msg.sender == bettingContract);
-    require(voted[voter] == false);
-    require(!closed);
-    if(approve) forResult += 1;
-    else againstResult += 1;
-    voted[voter] = true;
-    votes[voter] = approve;
-    totalVoters += 1;
-  }
-
-  function closeBallot() public returns (bool) {
-    require(!closed);
-    require(now > votingEnd);
-    if(totalVoters > possibleVoters.div(2)) {
-      if(forResult.mul(100000).div(totalVoters) >= threshold) {
-        validResult = true;
-      }
-    }
-    closed = true;
-    return validResult;
-  }
-}
-
+import "./SafeMath.sol";
+import "./BallotSB52.sol";
 
 contract Superbowl52 {
   using SafeMath for uint;
@@ -108,7 +9,7 @@ contract Superbowl52 {
   bool public resultConfirmed = false;
   address public owner;
 
-  mapping(address => betting) bets;
+  mapping(address => betting) public bets;
   uint public totalBets;
   uint public philadelphiaBets;
   uint public newEnglandBets;
@@ -117,9 +18,10 @@ contract Superbowl52 {
   bool public votingOpen;
   bool public withdrawalOpen;
   uint public threshold;
-  bool public deadlocked;
+  uint public winningPot;
+  mapping(address => uint) public wins;
 
-  BallotSB52 ballot;
+  BallotSB52 public ballot;
 
   struct betting {
     uint philadelphiaBets;
@@ -128,18 +30,14 @@ contract Superbowl52 {
   }
 
   function Superbowl52() public {
+    require(now<GAME_START_TIME);
     owner = msg.sender;
     result = 0;
     votingOpen = false;
     withdrawalOpen = false;
-    // 75%
-    threshold = 75000;
-    deadlocked = false;
-  }
-
-  modifier notDeadlocked() {
-    require(!deadlocked);
-    _;
+    // 90%
+    threshold = 90000;
+    winningPot = 0;
   }
 
   // team 1 is Philadelphia
@@ -172,65 +70,66 @@ contract Superbowl52 {
     return bets[better].newEnglandBets;
   }
 
-  function isClaimed(address better) public constant returns (bool) {
+  function hasClaimed(address better) public constant returns (bool) {
     return bets[better].claimed;
   }
 
-  function setResult(uint team) public notDeadlocked {
+  function startVoting() public {
     require(msg.sender == owner);
     require(votingOpen == false);
     require(withdrawalOpen == false);
-    result = team;
+    require(now >= GAME_START_TIME + 8 hours);
     votingOpen = true;
-    ballot = new BallotSB52(team, betters, threshold);
-  }
-
-  function approveResult() public {
-    require(votingOpen);
-    ballot.voteResult(true, msg.sender);
-  }
-
-  function disapproveResult() public {
-    require(votingOpen);
-    ballot.voteResult(false, msg.sender);
+    ballot = new BallotSB52(threshold);
   }
 
   function hasBet(address better) public constant returns (bool) {
     return (bets[better].philadelphiaBets + bets[better].newEnglandBets) > 0;
   }
 
-  function endVoting(uint team) public notDeadlocked {
+  function endVoting() public {
     require(votingOpen);
-    if(ballot.closeBallot()) {
-      // match ends without a winner
-      if(result == 3) deadlocked = true;
-      else {
+    result = ballot.closeBallot();
+    // ballot ends with success
+    if (result == 1 || result == 2) {
         withdrawalOpen = true;
         votingOpen = false;
-      }
     } else {
       threshold = threshold - 5000;
-      if(threshold >= 50000) ballot = new BallotSB52(team, betters, threshold);
-      else deadlocked = true;
+      ballot = new BallotSB52(threshold);
+    }
+    if(result == 1) winningPot = totalBets.sub(newEnglandBets.div(100));
+    if(result == 2) winningPot = totalBets.sub(philadelphiaBets.div(100));
+  }
+
+  function getLosersOnePercent(uint loser) public returns (uint) {
+    require(votingOpen);
+    require(msg.sender == address(ballot));
+    if(loser==1) {
+      ballot.transfer(philadelphiaBets.div(100));
+      return philadelphiaBets.div(100);
+    }
+    else if (loser==2) {
+      ballot.transfer(newEnglandBets.div(100));
+      return newEnglandBets.div(100);
+    }
+    else {
+      return 0;
     }
   }
 
-  function refund() public {
-    require(deadlocked);
-    uint toRefund = getNewEnglandBets(msg.sender) + getPhiladelphiaBets(msg.sender);
-    msg.sender.transfer(toRefund);
-  }
-
-  function getWinnings() public notDeadlocked {
+  function getWinnings(address winner, uint donation) public {
+    require(donation<=100);
     require(withdrawalOpen);
-    require(bets[msg.sender].claimed == false);
-    uint winnings;
-    uint phiBets = getPhiladelphiaBets(msg.sender);
-    uint neBets = getNewEnglandBets(msg.sender);
-    if(result == 1) winnings = phiBets.div(totalBets);
-    else winnings = neBets.div(totalBets);
-    bets[msg.sender].claimed = true;
-    msg.sender.transfer(winnings);
+    require(bets[winner].claimed == false);
+    uint winnings = 0;
+    if (result == 1) winnings = (getPhiladelphiaBets(winner).mul(winningPot)).div(philadelphiaBets);
+    else if (result == 2) winnings = (getNewEnglandBets(winner).mul(winningPot)).div(newEnglandBets);
+    else revert();
+    wins[winner] = winnings;
+    uint donated = winnings.mul(donation).div(100);
+    bets[winner].claimed = true;
+    winner.transfer(winnings-donated);
   }
 
 }
