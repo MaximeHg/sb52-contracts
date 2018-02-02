@@ -154,7 +154,7 @@ contract('Superbowl52', function(accounts) {
 
     it("should be possible to withdraw winnings", async() => {
       let balanceBefore = await web3.eth.getBalance(accounts[1]);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[1], 0);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[1]});
       let balanceAfter = await web3.eth.getBalance(accounts[1]);
       let hasClaimed = await Superbowl52Instance.hasClaimed(accounts[1]);
       assert.isTrue(hasClaimed);
@@ -163,7 +163,7 @@ contract('Superbowl52', function(accounts) {
 
     it("should not send anything to losers", async() => {
       let balanceBefore = await web3.eth.getBalance(accounts[2]);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[2], 0);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[2]});
       let balanceAfter = await web3.eth.getBalance(accounts[2]);
       let hasClaimed = await Superbowl52Instance.hasClaimed(accounts[2]);
       assert.isTrue(hasClaimed);
@@ -173,13 +173,13 @@ contract('Superbowl52', function(accounts) {
     });
 
     it("should not be possible to withdraw winnings twice", async() => {
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[1], 0).should.be.rejectedWith(revert);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[1]}).should.be.rejectedWith(revert);
     });
 
     it("balance should be equal to 0 once everyone withdrew", async() => {
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[3], 0);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[5], 0);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[6], 0);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[3]});
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[5]});
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[6]});
       let balanceContract = await web3.eth.getBalance(Superbowl52Instance.address);
       assert.equal(balanceContract.toNumber(), 0, "balance should be empty");
     });
@@ -297,7 +297,7 @@ contract('Superbowl52', function(accounts) {
 
     it("should be possible to withdraw winnings", async() => {
       let balanceBefore = await web3.eth.getBalance(accounts[1]);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[1], 0);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[1]});
       let balanceAfter = await web3.eth.getBalance(accounts[1]);
       let hasClaimed = await Superbowl52Instance.hasClaimed(accounts[1]);
       assert.isTrue(hasClaimed);
@@ -306,20 +306,23 @@ contract('Superbowl52', function(accounts) {
 
     it("should not send anything to losers", async() => {
       let balanceBefore = await web3.eth.getBalance(accounts[2]);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[2], 0);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[2]});
       let balanceAfter = await web3.eth.getBalance(accounts[2]);
       let hasClaimed = await Superbowl52Instance.hasClaimed(accounts[2]);
       assert.isTrue(hasClaimed);
       let wins = await Superbowl52Instance.wins.call(accounts[2]);
       assert.equal(wins, 0, "should be equal to 0");
-      assert.equal(balanceAfter.toNumber(), balanceBefore.toNumber(), "should have not won ether");
+      assert.isAbove(balanceBefore.toNumber(), balanceAfter.toNumber(), "should have not won ether");
     });
 
     it("balance should be equal to 0 once everyone withdrew", async() => {
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[3], 0);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[5], 0);
-      await Superbowl52Instance.getWinnings.sendTransaction(accounts[6], 0);
+      let balanceOwner = await web3.eth.getBalance(accounts[0]);
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[3]});
+      await Superbowl52Instance.getWinnings.sendTransaction(0, {from:accounts[5]});
+      await Superbowl52Instance.getWinnings.sendTransaction(1, {from:accounts[6]});
+      let balanceOwner2 = await web3.eth.getBalance(accounts[0]);
       let balanceContract = await web3.eth.getBalance(Superbowl52Instance.address);
+      assert.isAbove(balanceOwner2.toNumber(), balanceOwner.toNumber(), "should have donations");
       assert.equal(balanceContract.toNumber(), 0, "balance should be empty");
     });
 

@@ -3,6 +3,11 @@ pragma solidity ^0.4.18;
 import "./SafeMath.sol";
 import "./BallotSB52.sol";
 
+// Contract written by MaximeHg
+// https://github.com/MaximeHg/sb52-contracts
+// Special thanks to moodysalem and its ethersquares contracts for the inspiration!
+// https://github.com/ethersquares/ethersquares-contracts
+
 contract Superbowl52 {
   using SafeMath for uint;
   uint public constant GAME_START_TIME = 1517787000;
@@ -75,7 +80,6 @@ contract Superbowl52 {
   }
 
   function startVoting() public {
-    require(msg.sender == owner);
     require(votingOpen == false);
     require(withdrawalOpen == false);
     require(now >= GAME_START_TIME + 8 hours);
@@ -92,8 +96,11 @@ contract Superbowl52 {
     result = ballot.closeBallot();
     // ballot ends with success
     if (result == 1 || result == 2) {
-        withdrawalOpen = true;
-        votingOpen = false;
+      withdrawalOpen = true;
+      votingOpen = false;
+    } else if (result == 9) {
+      votingOpen = false;
+      withdrawalOpen = false;
     } else {
       threshold = threshold - 5000;
       ballot = new BallotSB52(threshold);
@@ -118,18 +125,27 @@ contract Superbowl52 {
     }
   }
 
-  function getWinnings(address winner, uint donation) public {
+  // triggered only if tie in the final ballot
+  function breakTie(uint team) {
+    require(result == 9);
+    require(msg.sender == owner);
+    result = team;
+    withdrawalOpen = true;
+  }
+
+  function getWinnings(uint donation) public {
     require(donation<=100);
     require(withdrawalOpen);
-    require(bets[winner].claimed == false);
+    require(bets[msg.sender].claimed == false);
     uint winnings = 0;
-    if (result == 1) winnings = (getPhiladelphiaBets(winner).mul(winningPot)).div(philadelphiaBets);
-    else if (result == 2) winnings = (getNewEnglandBets(winner).mul(winningPot)).div(newEnglandBets);
+    if (result == 1) winnings = (getPhiladelphiaBets(msg.sender).mul(winningPot)).div(philadelphiaBets);
+    else if (result == 2) winnings = (getNewEnglandBets(msg.sender).mul(winningPot)).div(newEnglandBets);
     else revert();
-    wins[winner] = winnings;
+    wins[msg.sender] = winnings;
     uint donated = winnings.mul(donation).div(100);
-    bets[winner].claimed = true;
-    winner.transfer(winnings-donated);
+    bets[msg.sender].claimed = true;
+    owner.transfer(donated);
+    msg.sender.transfer(winnings-donated);
   }
 
 }

@@ -3,6 +3,11 @@ pragma solidity ^0.4.18;
 import "./SafeMath.sol";
 import "./Superbowl52.sol";
 
+// Contract written by MaximeHg
+// https://github.com/MaximeHg/sb52-contracts
+// Special thanks to moodysalem and its ethersquares contracts for the inspiration!
+// https://github.com/ethersquares/ethersquares-contracts
+
 contract BallotSB52 {
   using SafeMath for uint;
   uint public phiWon;
@@ -57,7 +62,12 @@ contract BallotSB52 {
   function closeBallot() public returns (uint) {
     require(!closed);
     require(now > votingEnd);
-    if(phiWon.mul(100000).div(totalVoters) >= threshold) {
+    if((phiWon.mul(100000).div(totalVoters) == neWon.mul(100000).div(totalVoters)) && (threshold == 50000)) {
+      validResult = 9;
+      closed = true;
+      tie = true;
+      return validResult;
+    } else if(phiWon.mul(100000).div(totalVoters) >= threshold) {
       validResult = 1;
       votingReward = bettingContract.getLosersOnePercent(2);
       majorityReward = (neWon * 50 finney).add(votingReward).div(phiWon);
