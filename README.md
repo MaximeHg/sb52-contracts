@@ -7,7 +7,7 @@ This repository contains contracts that will secure bets on the Superbowl 52 out
 To bet for your favorite, interact with the deployed contract by sending value to the bet function
 and passing in parameter 1 for Philadelphia or 2 for New England. <br>
 
-Contract address with interface will be available once the final contract is deployed. <br>
+Contract has been deployed [here](https://etherscan.io/address/0xa4ec44afee34feffbae5ce4218d3c06ebd70455e), can be accessed through [Pragma](https://etherscan.io/address/0xa4ec44afee34feffbae5ce4218d3c06ebd70455e) or through a [webapp](https://ethereum-sb52.herokuapp.com/) I've developped. Please note that you need Metamask installed for it to work. <br>
 
 ## Workflow of the contract
 
